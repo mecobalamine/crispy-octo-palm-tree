@@ -137,7 +137,7 @@ def show_clustered_image(image, points, num_of_cluster):
 
 
 def main():
-    input_file = "./assets/seg_test.jpg"
+    input_file = "../assets/seg_test.jpg"
     output_file = "./assets/seg_test_out_fcm.jpg"
     image = cv.imread(input_file, cv.IMREAD_GRAYSCALE)
 

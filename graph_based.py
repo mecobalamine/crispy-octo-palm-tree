@@ -2,12 +2,11 @@ import argparse
 import const
 import cv2 as cv
 import numpy as np
-import random
 
 from matplotlib import pyplot as plt
 
 
-class Node:
+class Node(object):
     def __init__(self, parent, rank=0, size=1):
         self.parent = parent
         self.rank = rank
@@ -17,10 +16,10 @@ class Node:
         return '(parent=%s, rank=%s, size=%s)' % (self.parent, self.rank, self.size)
 
 
-class Forest:
+class Forest(object):
     def __init__(self, num_of_nodes):
         self.nodes = [Node(i) for i in range(num_of_nodes)]
-        self.num_of_nodes = num_of_nodes
+        self.count = num_of_nodes
 
     def size_of(self, i):
         return self.nodes[i].size
@@ -28,10 +27,15 @@ class Forest:
     def find(self, n):
         x = n
         while x != self.nodes[x].parent:
+            if x < 0:
+                return x
             self.nodes[x].parent = self.nodes[self.nodes[x].parent].parent
             x = self.nodes[x].parent
 
         return x
+
+    def solid(self, n, parent):
+        self.nodes[self.find(n)].parent = parent
 
     def union(self, p, q):
         if self.nodes[p].rank > self.nodes[q].rank:
@@ -44,7 +48,7 @@ class Forest:
             if self.nodes[p].rank == self.nodes[q].rank:
                 self.nodes[q].rank += 1
 
-        self.num_of_nodes -= 1
+        self.count -= 1
 
     def print(self):
         for node in self.nodes:
@@ -56,21 +60,23 @@ def outer_diff(image, x1, y1, x2, y2):
     return np.sqrt(_sum)
 
 
-def inner_diff(size, k):
+def theta(size, k):
     return k * 1. / size
 
 
-class Graph:
-    def __init__(self, image, k, min_size, neighborhood_8):
+class Graph(object):
+    def __init__(self, image, k=10.0, min_size=2000, neighborhood_8=True):
         self.image = image
         self.num_of_nodes = image.shape[0] * image.shape[1]
         self.k = k
         self.min_size = min_size
         self.neighborhood_8 = neighborhood_8
 
+        self.index = None
         self.forest = None
         self.graph = None
         self.result = None
+        self.dummy = None
 
     def create_edge(self, x1, y1, x2, y2):
         def vertex_id(x, y):
@@ -116,7 +122,7 @@ class Graph:
             return _edge[2]
 
         self.graph = sorted(self.graph, key=diff)
-        tree_diff = [inner_diff(1, self.k) for _ in range(self.num_of_nodes)]
+        tree_diff = [theta(1, self.k) for _ in range(self.num_of_nodes)]
 
         for edge in self.graph:
             root_p = self.forest.find(edge[0])
@@ -125,23 +131,49 @@ class Graph:
             if root_p != root_q and diff(edge) <= tree_diff[root_p] and diff(edge) <= tree_diff[root_q]:
                 self.forest.union(root_p, root_q)
                 new_root = self.forest.find(root_p)
-                tree_diff[new_root] = diff(edge) + inner_diff(self.forest.nodes[new_root].size, self.k)
+                tree_diff[new_root] = diff(edge) + theta(self.forest.nodes[new_root].size, self.k)
+        # self.generate_dummy()
+
+    def generate_dummy(self):
+        height = self.image.shape[0]
+        width = self.image.shape[1]
+
+        dummy = np.zeros((height, width), np.uint8)
+        for y in range(height):
+            for x in range(width):
+                dummy[y, x] = self.forest.find(width * y + x)
+        self.dummy = dummy
+        # cv.imwrite("./assets/dummy.jpg", dummy)
 
     def generate_result(self):
         height = self.image.shape[0]
         width = self.image.shape[1]
 
-        def random_color():
-            return int(random.random() * 255), int(random.random() * 255), int(random.random() * 255)
+        # def random_color():
+        #     return int(random.random() * 255), int(random.random() * 255), int(random.random() * 255)
+        #
+        # colors = [random_color() for _ in range(width * height)]
 
-        colors = [random_color() for _ in range(width * height)]
-
-        result = np.zeros((height, width, 3), np.uint8)
+        index = 0
+        indices = dict()
+        result = np.zeros((height, width), np.uint8)
         for y in range(height):
             for x in range(width):
                 component = self.forest.find(width * y + x)
-                result[y, x] = colors[component]
+                if component in indices:
+                    result[y, x] = indices[component]
+                else:
+                    result[y, x] = index
+                    indices[component] = index
+                    index = index + 1
+        self.index = index
         self.result = result
+        # cv.imwrite("./assets/dummy.jpg", result)
+
+    def dummy(self):
+        self.build_graph()
+        self.segment()
+        self.generate_dummy()
 
     def run(self):
         print("Creating graph...")
@@ -151,7 +183,7 @@ class Graph:
         self.merge_components()
         print("Visualizing segmentation...")
         self.generate_result()
-        print("Number of components: {}".format(self.forest.num_of_nodes))
+        print("Number of components: {}".format(self.forest.count))
 
 
 def get_args():
@@ -175,12 +207,12 @@ def get_args():
 
 
 def main(args):
-    input_file = const.input_file
-    output_file = const.output_file
+    input_file = const.input_file()
+    output_file = const.output_file()
     image = cv.imread(input_file, cv.IMREAD_GRAYSCALE)
 
     # Gaussian Filter
-    smooth_image = cv.GaussianBlur(image, args.kernel, 0)
+    smooth_image = cv.GaussianBlur(image, const.kernel(), 0)
 
     graph = Graph(smooth_image, k=args.k, min_size=args.min_size, neighborhood_8=args.neighborhood_8)
     graph.run()
@@ -190,9 +222,12 @@ def main(args):
     fig.clf()
     ax1 = fig.add_subplot(1, 2, 1)
     ax1.imshow(image, cmap='gray')
+    ax1.set_axis_off()
 
     ax2 = fig.add_subplot(1, 2, 2)
-    ax2.imshow(result, cmap='Paired', interpolation='nearest')
+    ax2.imshow(result, cmap='Accent', interpolation='nearest')
+    ax2.set_axis_off()
+
     plt.show()
 
 

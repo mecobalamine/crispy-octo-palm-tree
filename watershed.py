@@ -1,11 +1,11 @@
 import argparse
-import  const
+import const
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-class Watershed:
+class Watershed(object):
     WSHD = -1
     INQE = -2
 
@@ -21,7 +21,7 @@ class Watershed:
     def generate_maskers(self):
         # Converting to grayscale
         ret, thresh = cv.threshold(self.image, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
-        # cv.imshow("thresh", thresh)
+        cv.imwrite("./assets/thresh.jpg", thresh)
 
         # Noise removal - opening morphological transformation gives in this case better results then closing.
         opening = cv.morphologyEx(thresh, cv.MORPH_OPEN, self.kernel)
@@ -30,11 +30,11 @@ class Watershed:
 
         # Background area determination - with dilation, to segment only background area
         background = cv.dilate(opening, self.kernel)
-        # cv.imshow("background", background)
+        cv.imwrite("./assets/background.jpg", background)
 
         # Foreground area determination - with erosion, to segment only foreground area
         foreground = cv.morphologyEx(thresh, cv.MORPH_ERODE, self.kernel)
-        # cv.imshow("foreground", foreground)
+        cv.imwrite("./assets/foreground.jpg", foreground)
 
         # Finding unknown region with background and foreground subtraction
         foreground = np.uint8(foreground)
@@ -51,6 +51,17 @@ class Watershed:
 
         # Now, mark the region of unknown with zero
         markers[unknown == 255] = 0
+        #
+        # fig = plt.figure()
+        # fig.clf()
+        #
+        # ax1 = fig.add_subplot(1, 1, 1)
+        # ax1.imshow(markers, cmap='Paired', interpolation='nearest')
+        # ax1.set_axis_off()
+        #
+        # plt.show()
+
+        cv.imwrite("./assets/markers.jpg", unknown)
 
         self.markers = markers
 
@@ -209,13 +220,13 @@ def get_args():
 
 
 def main(args):
-    input_file = const.input_file
-    output_file = const.output_file
+    input_file = const.input_file()
+    output_file = const.output_file()
     image = cv.imread(input_file, cv.IMREAD_GRAYSCALE)
     # Gaussian Filter
-    smooth_image = cv.GaussianBlur(image, args.kernel, 0)
+    smooth_image = cv.GaussianBlur(image, const.kernel(), 0)
 
-    w = Watershed(smooth_image, args.kernel)
+    w = Watershed(smooth_image, const.kernel())
     w.run()
     result = w.markers
 
@@ -223,9 +234,12 @@ def main(args):
     fig.clf()
     ax1 = fig.add_subplot(1, 2, 1)
     ax1.imshow(image, cmap='gray')
+    ax1.set_axis_off()
 
     ax2 = fig.add_subplot(1, 2, 2)
     ax2.imshow(result, cmap='Paired', interpolation='nearest')
+    ax2.set_axis_off()
+
     plt.show()
 
 

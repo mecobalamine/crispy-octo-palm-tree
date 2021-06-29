@@ -55,10 +55,10 @@ def sliding_window(image, neighbour_effect, win_size):
                 filtered_image.append(0)
                 continue
 
-            # --------------Find reliable set matrix--------------
+            # Find reliable set matrix
             reliable_mat = find_reliable_set(cur_window, win_size, win_center)
 
-            # --------------Weighting coefficients about window--------------
+            # Weighting coefficients about window
             center_window = np.full((win_size[1], win_size[0]), cur_window[win_center[0], win_center[1]])
             gray_delta = cur_window - center_window
 
@@ -71,15 +71,16 @@ def sliding_window(image, neighbour_effect, win_size):
 
             coe_window = coe_gray * coe_dist
 
-            # --------------New intensity value of the center point in the window--------------
+            # New intensity value of the center point in the window
             new_gray = np.sum(coe_window * cur_window) / np.sum(coe_window)
             filtered_image.append(round(new_gray))
 
     filtered_image = np.array(filtered_image)
+
     return filtered_image
 
 
-class FCM:
+class FCM(object):
     def __init__(self, image, num_of_clusters, m, neighbor_effect, epsilon, max_iter, kernel):
         self.image = image
         self.num_of_clusters = num_of_clusters
@@ -132,6 +133,8 @@ class FCM:
 
         self.filtered_image = filtered_image.reshape(self.image.shape).astype(self.image.dtype)
 
+        cv.imwrite("./assets/filtered.jpg", self.filtered_image)
+
     def calculate_histogram(self):
         hist = cv.calcHist([self.filtered_image], [0], None, [256], [0, 256])
         self.gray_num = len(hist)
@@ -150,15 +153,15 @@ class FCM:
 
         self.result = self.result.reshape(self.image.shape).astype('int')
 
-        def random_color():
-            return int(random.random() * 255), int(random.random() * 255), int(random.random() * 255)
+        # def random_color():
+        #     return int(random.random() * 255), int(random.random() * 255), int(random.random() * 255)
 
         height = self.image.shape[0]
         width = self.image.shape[1]
 
-        colors = [random_color() for _ in range(self.num_of_clusters)]
+        colors = [_ for _ in range(self.num_of_clusters)]
 
-        result = np.zeros((height, width, 3), np.uint8)
+        result = np.zeros((height, width), np.uint8)
         for y in range(height):
             for x in range(width):
                 result[y, x] = colors[self.result[y][x]]
@@ -192,7 +195,7 @@ def get_args():
                         help='input path')
     parser.add_argument('--output_path', type=str, default="./assets/results",
                         help='output path')
-    parser.add_argument('--num_of_clusters', type=int, default=4,
+    parser.add_argument('--num_of_clusters', type=int, default=2,
                         help="Number of cluster")
     parser.add_argument('--fuzziness', type=int, default=2,
                         help="fuzziness degree")
@@ -211,13 +214,13 @@ def get_args():
 
 
 def main(args):
-    input_file = const.input_file
-    output_file = const.output_file
+    input_file = const.input_file()
+    output_file = const.output_file()
     image = cv.imread(input_file, cv.IMREAD_GRAYSCALE)
 
     # --------------Clustering--------------
     fcm = FCM(image, num_of_clusters=args.num_of_clusters, m=args.fuzziness, neighbor_effect=args.neighbor_effect,
-              epsilon=args.epsilon, max_iter=args.max_iteration, kernel=args.kernel)
+              epsilon=args.epsilon, max_iter=args.max_iteration, kernel=const.kernel())
     fcm.run()
     result = fcm.result
 
@@ -225,9 +228,12 @@ def main(args):
     fig.clf()
     ax1 = fig.add_subplot(1, 2, 1)
     ax1.imshow(image, cmap='gray')
+    ax1.set_axis_off()
 
     ax2 = fig.add_subplot(1, 2, 2)
-    ax2.imshow(result, cmap='Accent', interpolation='nearest')
+    ax2.imshow(result, cmap='Blues_r', interpolation='nearest')
+    ax2.set_axis_off()
+
     plt.show()
 
 

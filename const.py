@@ -1,3 +1,6 @@
+import cv2 as cv
+
+
 class Const:
     class ConstError(TypeError):
         pass
@@ -15,10 +18,60 @@ class Const:
 
 const = Const()
 
-const.input_file = "./assets/seg_test.jpg"
-const.output_file = "./assets/seg_test_out_graph.jpg"
+const.INPUT_FILE = "./assets/seg_test.jpg"
+const.OUTPUT_FILE = "./assets/seg_test_out_graph.jpg"
+const.RESULT_FILE = "./assets/seg_test_result.jpg"
 
-const.input_path = "./assets/images"
-const.output_path = "./assets/results"
+const.INPUT_PATH = "./assets/images"
+const.OUTPUT_PATH = "./assets/results"
 
-const.kernel = (5, 5)
+const.SMOOTHING = 4
+const.LAMBDA1 = 1
+const.LAMBDA2 = 5
+const.ITERATION = 5
+
+const.KERNEL = (5, 5)
+
+
+def input_file():
+    return const.INPUT_FILE
+
+
+def output_file():
+    return const.OUTPUT_FILE
+
+
+def result_file():
+    return const.RESULT_FILE
+
+
+def kernel():
+    return const.KERNEL
+
+
+def smoothing():
+    return const.SMOOTHING
+
+
+def lambda1():
+    return const.LAMBDA1
+
+
+def lambda2():
+    return const.LAMBDA2
+
+
+def iteration():
+    return const.ITERATION
+
+
+def get_target():
+    target = cv.imread(result_file(), cv.IMREAD_GRAYSCALE)
+    shape = target.shape
+    height = shape[0]
+    width = shape[1]
+    for y in range(height):
+        for x in range(width):
+            if target[y, x] != 0:
+                target[y, x] = 1
+    return target
